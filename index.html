@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Voice Sheet Collector</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6b4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  :root{
+    --bg:#eef1ea; --card:#ffffff; --ink:#1d2a24; --muted:#5c6b63;
+    --line:#cfd8cf; --accent:#2f6b4f; --accent-ink:#ffffff; --err:#a8321f; --ok:#2f6b4f; --rec:#c8321f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121a16; --card:#1b2621; --ink:#e6eee9; --muted:#93a39a;
+      --line:#2f3d36; --accent:#5fb98c; --accent-ink:#0f1a14; --err:#ff8a73; --ok:#5fb98c; --rec:#ff6b55;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);
+    min-height:100vh;
+  }
+  main{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .icon-btn{background:none;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+  input[type=text],input[type=url],textarea,select{
+    width:100%;font:inherit;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:10px;padding:12px;
+  }
+  textarea{min-height:84px;resize:vertical}
+  input:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .input-wrap{display:flex;gap:8px;align-items:stretch}
+  .input-wrap > input,.input-wrap > textarea{flex:1;min-width:0}
+  .mic{
+    flex:0 0 52px;border:1px solid var(--line);background:var(--bg);color:var(--accent);
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+  }
+  .mic svg{width:24px;height:24px;fill:currentColor}
+  .mic.rec{background:var(--rec);border-color:var(--rec);color:#fff;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--rec) 25%,transparent)}}
+  @media (prefers-reduced-motion: reduce){.mic.rec{animation:none}}
+  .primary{
+    width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;
+    padding:15px;font:inherit;font-weight:650;font-size:17px;
+  }
+  .primary:disabled{opacity:.6}
+  .status{margin-top:12px;font-size:14px;min-height:20px}
+  .status.err{color:var(--err)} .status.ok{color:var(--ok)}
+  .hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+  .row{display:flex;gap:8px;margin-bottom:8px}
+  .row input{flex:1}
+  .row button{border:1px solid var(--line);background:none;color:var(--err);border-radius:10px;padding:0 12px;font:inherit}
+  .link-btn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;padding:8px 0}
+  #settings{display:none}
+  #settings.open{display:block}
+  #pending{font-size:13px;color:var(--muted);margin-top:8px}
+  #voiceWarn{display:none}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Voice Sheet Collector</h1>
+    <button class="icon-btn" id="toggleSettings" type="button">Settings</button>
+  </header>
+
+  <p class="hint" id="voiceWarn">Voice input isn't supported in this browser. Open this page in Chrome (Android) or Safari (iPhone) to use the mic buttons. You can still type.</p>
+
+  <section id="settings" class="card" aria-label="Settings">
+    <div class="field">
+      <label for="url">Apps Script web app URL</label>
+      <input type="url" id="url" placeholder="https://script.google.com/macros/s/.../exec" inputmode="url" autocomplete="off">
+      <p class="hint">Paste the URL you get after deploying the Apps Script.</p>
+    </div>
+    <div class="field">
+      <label for="lang">Speaking language</label>
+      <select id="lang">
+        <option value="en-IN">English (India)</option>
+        <option value="hi-IN">Hindi (हिन्दी)</option>
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="pa-IN">Punjabi</option>
+        <option value="mr-IN">Marathi</option>
+        <option value="ta-IN">Tamil</option>
+        <option value="te-IN">Telugu</option>
+        <option value="bn-IN">Bengali</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Input fields</label>
+      <div id="fieldList"></div>
+      <button class="link-btn" id="addField" type="button">Add field</button>
+    </div>
+    <button class="primary" id="saveSettings" type="button">Save settings</button>
+  </section>
+
+  <form id="form" class="card" novalidate></form>
+
+  <button class="primary" id="submit" type="button">Submit to sheet</button>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div id="pending"></div>
+</main>
+
+<script>
+(function(){
+  var DEFAULT_FIELDS = ["Name","Item","Quantity","Notes"];
+  var store = {
+    get: function(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+    set: function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  };
+  var fields = DEFAULT_FIELDS.slice();
+  try{ var f = JSON.parse(store.get("fields")||"null"); if(Array.isArray(f) && f.length) fields=f; }catch(e){}
+  var url = store.get("url") || "";
+  var lang = store.get("lang") || "en-IN";
+  var queue = [];
+  try{ queue = JSON.parse(store.get("queue")||"[]"); }catch(e){ queue=[]; }
+
+  var $ = function(id){ return document.getElementById(id); };
+  var form=$("form"), statusEl=$("status"), submitBtn=$("submit");
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var MIC_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2z"/></svg>';
+
+  function setStatus(msg, cls){ statusEl.textContent=msg||""; statusEl.className="status "+(cls||""); }
+
+  /* ---------- Voice input ---------- */
+  var active = null; // {rec, btn, el}
+
+  function stopActive(){
+    if(active){ try{ active.rec.stop(); }catch(e){} }
+  }
+
+  function toggleMic(btn, el){
+    if(active && active.btn===btn){ stopActive(); return; }
+    stopActive();
+
+    var rec = new SR();
+    rec.lang = lang;
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+
+    var base = el.value.trim();
+    var finalText = "";
+    active = {rec:rec, btn:btn, el:el};
+    btn.classList.add("rec");
+    btn.setAttribute("aria-pressed","true");
+    setStatus("Listening… tap the mic again to stop.");
+
+    function compose(interim){
+      var spoken = (finalText + interim).trim();
+      el.value = (base && spoken) ? base + " " + spoken : (base || spoken);
+    }
+
+    rec.onresult = function(ev){
+      var interim = "";
+      for(var i=ev.resultIndex;i<ev.results.length;i++){
+        var t = ev.results[i][0].transcript;
+        if(ev.results[i].isFinal) finalText += t + " "; else interim += t;
+      }
+      compose(interim);
+    };
+    rec.onerror = function(ev){
+      var msg = {
+        "not-allowed":"Microphone access was blocked. Allow it in your browser's site settings.",
+        "service-not-allowed":"Microphone access was blocked. Allow it in your browser's site settings.",
+        "no-speech":"Didn't hear anything. Tap the mic and try again.",
+        "audio-capture":"No microphone found on this device.",
+        "network":"Speech recognition needs an internet connection.",
+        "language-not-supported":"This language isn't supported by your browser's speech service."
+      }[ev.error] || ("Voice input stopped ("+ev.error+").");
+      setStatus(msg,"err");
+    };
+    rec.onend = function(){
+      btn.classList.remove("rec");
+      btn.setAttribute("aria-pressed","false");
+      if(active && active.btn===btn) active=null;
+      if(statusEl.textContent.indexOf("Listening")===0) setStatus("");
+    };
+    try{ rec.start(); }catch(e){ setStatus("Couldn't start the microphone. Try again.","err"); }
+  }
+
+  /* ---------- Rendering ---------- */
+  function renderForm(){
+    stopActive();
+    form.innerHTML="";
+    fields.forEach(function(name,i){
+      var wrap=document.createElement("div"); wrap.className="field";
+      var lab=document.createElement("label"); lab.textContent=name; lab.htmlFor="f"+i;
+      var box=document.createElement("div"); box.className="input-wrap";
+      var el = /note|comment|description|remark/i.test(name) ? document.createElement("textarea") : document.createElement("input");
+      if(el.tagName==="INPUT") el.type="text";
+      el.id="f"+i; el.dataset.name=name; el.autocomplete="off";
+      box.appendChild(el);
+      if(SR){
+        var mic=document.createElement("button");
+        mic.type="button"; mic.className="mic"; mic.innerHTML=MIC_SVG;
+        mic.setAttribute("aria-label","Speak "+name); mic.setAttribute("aria-pressed","false");
+        mic.addEventListener("click", function(){ toggleMic(mic, el); });
+        box.appendChild(mic);
+      }
+      wrap.appendChild(lab); wrap.appendChild(box); form.appendChild(wrap);
+    });
+  }
+
+  function renderSettings(){
+    $("url").value=url; $("lang").value=lang;
+    var list=$("fieldList"); list.innerHTML="";
+    fields.forEach(function(name,i){
+      var row=document.createElement("div"); row.className="row";
+      var inp=document.createElement("input"); inp.type="text"; inp.value=name; inp.setAttribute("aria-label","Field "+(i+1)+" name");
+      inp.addEventListener("input", function(){ fields[i]=inp.value; });
+      var del=document.createElement("button"); del.type="button"; del.textContent="Remove";
+      del.addEventListener("click", function(){ fields.splice(i,1); renderSettings(); });
+      row.appendChild(inp); row.appendChild(del); list.appendChild(row);
+    });
+  }
+
+  function renderPending(){
+    $("pending").textContent = queue.length ? queue.length+" submission"+(queue.length>1?"s":"")+" waiting to upload (will retry on next submit)." : "";
+  }
+
+  $("toggleSettings").addEventListener("click", function(){ $("settings").classList.toggle("open"); });
+  $("addField").addEventListener("click", function(){ fields.push("New field"); renderSettings(); });
+  $("saveSettings").addEventListener("click", function(){
+    fields = fields.map(function(s){return s.trim();}).filter(Boolean);
+    if(!fields.length) fields = DEFAULT_FIELDS.slice();
+    url = $("url").value.trim(); lang = $("lang").value;
+    store.set("url",url); store.set("lang",lang); store.set("fields",JSON.stringify(fields));
+    renderForm(); renderSettings(); $("settings").classList.remove("open");
+    setStatus("Settings saved.","ok");
+  });
+
+  /* ---------- Upload ---------- */
+  function send(payload){
+    // text/plain avoids a CORS preflight; Apps Script reads the raw body.
+    return fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+  }
+
+  submitBtn.addEventListener("click", function(){
+    stopActive();
+    if(!url){ $("settings").classList.add("open"); setStatus("Add your Apps Script URL in Settings first.","err"); return; }
+    var values={}, any=false;
+    form.querySelectorAll("[data-name]").forEach(function(el){ values[el.dataset.name]=el.value.trim(); if(el.value.trim()) any=true; });
+    if(!any){ setStatus("Fill in at least one field.","err"); return; }
+
+    queue.push({ts:new Date().toISOString(), values:values, fields:fields.slice()});
+    store.set("queue",JSON.stringify(queue));
+    submitBtn.disabled=true; setStatus("Uploading…");
+
+    (function next(){
+      if(!queue.length){ done(); return; }
+      send(queue[0]).then(function(){ queue.shift(); store.set("queue",JSON.stringify(queue)); next(); })
+        .catch(function(){ done(true); });
+    })();
+
+    function done(failed){
+      submitBtn.disabled=false; renderPending();
+      if(failed){ setStatus("No connection. Your entry is saved and will upload on your next submit.","err"); }
+      else{
+        setStatus("Sent. Check the sheet to confirm the new row.","ok");
+        form.querySelectorAll("[data-name]").forEach(function(el){ el.value=""; });
+      }
+    }
+  });
+
+  if(!SR) $("voiceWarn").style.display="block";
+  renderForm(); renderSettings(); renderPending();
+  if(!url) $("settings").classList.add("open");
+})();
+</script>
+</body>
+</html>
