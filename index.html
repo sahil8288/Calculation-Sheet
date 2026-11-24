@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sheet Collector</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6b4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  :root{
+    --bg:#eef1ea; --card:#ffffff; --ink:#1d2a24; --muted:#5c6b63;
+    --line:#cfd8cf; --accent:#2f6b4f; --accent-ink:#ffffff; --err:#a8321f; --ok:#2f6b4f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121a16; --card:#1b2621; --ink:#e6eee9; --muted:#93a39a;
+      --line:#2f3d36; --accent:#5fb98c; --accent-ink:#0f1a14; --err:#ff8a73; --ok:#5fb98c;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);
+    min-height:100vh;
+  }
+  main{max-width:480px;margin:0 auto;padding:20px 16px 24px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  h1{font-size:22px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .icon-btn{background:none;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-size:14px}
+  .tabs{display:flex;gap:6px;margin-bottom:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px}
+  .tab{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:10px;border-radius:9px}
+  .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+  input[type=text],input[type=url],input[type=date],textarea{
+    width:100%;font:inherit;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:10px;padding:12px;
+  }
+  textarea{min-height:84px;resize:vertical}
+  input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .input-wrap{display:flex;gap:8px;align-items:stretch}
+  .input-wrap > input,.input-wrap > textarea{flex:1;min-width:0}
+  .clear{
+    flex:0 0 48px;border:1px solid var(--line);background:var(--bg);color:var(--muted);
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+  }
+  .clear svg{width:20px;height:20px;fill:currentColor}
+  .primary{
+    width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;
+    padding:15px;font:inherit;font-weight:650;font-size:17px;
+  }
+  .primary:disabled{opacity:.6}
+  .status{margin-top:12px;font-size:14px;min-height:20px}
+  .status.err{color:var(--err)} .status.ok{color:var(--ok)}
+  .hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+  .row{display:flex;gap:8px;margin-bottom:8px}
+  .row input{flex:1}
+  .row button{border:1px solid var(--line);background:none;color:var(--err);border-radius:10px;padding:0 12px;font:inherit}
+  .link-btn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;padding:8px 0}
+  #settings{display:none}
+  #settings.open{display:block}
+  #pending{font-size:13px;color:var(--muted);margin-top:8px}
+  #viewData{display:none}
+  .datebar{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px}
+  .datebar > div{flex:1;min-width:0}
+  .datebar label{margin-bottom:4px;font-size:13px;color:var(--muted)}
+  .datebar .icon-btn{height:46px}
+  .bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+  .bar .hint{margin:0}
+  .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+  .entry-date{font-weight:650;margin:0;font-size:15px}
+  .del{
+    flex:0 0 40px;height:40px;border:1px solid var(--line);background:none;color:var(--err);
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+  }
+  .del svg{width:20px;height:20px;fill:currentColor}
+  .del:disabled{opacity:.5}
+  .kv{display:flex;gap:8px;font-size:15px;padding:3px 0}
+  .kv .k{flex:0 0 38%;color:var(--muted);overflow-wrap:anywhere}
+  .kv .v{flex:1;overflow-wrap:anywhere;white-space:pre-wrap}
+  .empty{color:var(--muted);text-align:center;padding:24px 8px}
+  .totals{
+    position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
+    background:var(--card);border:2px solid var(--accent);border-radius:14px;padding:12px 16px;
+    box-shadow:0 4px 14px rgba(0,0,0,.12);
+  }
+  .totals h2{margin:0 0 6px;font-size:13px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .totals .t{display:flex;justify-content:space-between;font-size:17px;padding:2px 0}
+  .totals .t b{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sheet Collector</h1>
+    <button class="icon-btn" id="toggleSettings" type="button">Settings</button>
+  </header>
+
+  <section id="settings" class="card" aria-label="Settings">
+    <div class="field">
+      <label for="url">Apps Script web app URL</label>
+      <input type="url" id="url" placeholder="https://script.google.com/macros/s/.../exec" inputmode="url" autocomplete="off">
+      <p class="hint">Paste the URL you get after deploying the Apps Script.</p>
+    </div>
+    <div class="field">
+      <label>Input fields</label>
+      <div id="fieldList"></div>
+      <button class="link-btn" id="addField" type="button">Add field</button>
+    </div>
+    <button class="primary" id="saveSettings" type="button">Save settings</button>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tabEntry" aria-selected="true" type="button">New entry</button>
+    <button class="tab" role="tab" id="tabData" aria-selected="false" type="button">Submitted</button>
+  </div>
+
+  <section id="viewEntry">
+    <form id="form" class="card" novalidate></form>
+    <button class="primary" id="submit" type="button">Submit to sheet</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div id="pending"></div>
+  </section>
+
+  <section id="viewData">
+    <div class="datebar">
+      <div><label for="fromDate">From</label><input type="date" id="fromDate"></div>
+      <div><label for="toDate">To</label><input type="date" id="toDate"></div>
+      <button class="icon-btn" id="todayBtn" type="button">Today</button>
+    </div>
+    <div class="bar">
+      <p class="hint" id="dataInfo"></p>
+      <button class="icon-btn" id="refresh" type="button">Refresh</button>
+    </div>
+    <div id="dataList"></div>
+    <div class="totals" id="totals" aria-live="polite">
+      <h2 id="totalsTitle">Totals</h2>
+      <div class="t"><span>Bags</span><b id="totBags">0</b></div>
+      <div class="t"><span>Rate</span><b id="totRate">0</b></div>
+      <div class="t"><span>Advance</span><b id="totAdvance">0</b></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  var DEFAULT_FIELDS = ["Name","Bags","Rate","Advance"];
+  var OLD_DEFAULTS = ["Name","Item","Quantity","Notes"];
+  var NUMERIC = /^(bags|rate|advance)$/i;
+  var store = {
+    get: function(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+    set: function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  };
+  var fields = DEFAULT_FIELDS.slice();
+  try{
+    var f = JSON.parse(store.get("fields")||"null");
+    if(Array.isArray(f) && f.length && JSON.stringify(f)!==JSON.stringify(OLD_DEFAULTS)) fields=f;
+  }catch(e){}
+  var url = store.get("url") || "";
+  var queue = [];
+  try{ queue = JSON.parse(store.get("queue")||"[]"); }catch(e){ queue=[]; }
+  var lastPayload = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var form=$("form"), statusEl=$("status"), submitBtn=$("submit");
+  var X_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+  var TRASH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function setStatus(msg, cls){ statusEl.textContent=msg||""; statusEl.className="status "+(cls||""); }
+  function today(){
+    var d=new Date(), p=function(n){ return (n<10?"0":"")+n; };
+    return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+  }
+  function fmtDate(iso){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||"");
+    return m ? (parseInt(m[3],10)+" "+MONTHS[parseInt(m[2],10)-1]+" "+m[1]) : (iso||"");
+  }
+  function num(s){
+    var n = parseFloat(String(s==null?"":s).replace(/[^0-9.\-]/g,""));
+    return isNaN(n) ? 0 : n;
+  }
+  function fmtNum(n){ return n.toLocaleString("en-IN",{maximumFractionDigits:2}); }
+
+  /* ---------- Entry form ---------- */
+  function renderForm(){
+    form.innerHTML="";
+    fields.forEach(function(name,i){
+      var wrap=document.createElement("div"); wrap.className="field";
+      var lab=document.createElement("label"); lab.textContent=name; lab.htmlFor="f"+i;
+      var box=document.createElement("div"); box.className="input-wrap";
+      var el = /note|comment|description|remark/i.test(name) ? document.createElement("textarea") : document.createElement("input");
+      if(el.tagName==="INPUT"){
+        el.type="text";
+        if(NUMERIC.test(name)){ el.inputMode="decimal"; el.placeholder="0"; }
+      }
+      el.id="f"+i; el.dataset.name=name; el.autocomplete="off";
+      var clr=document.createElement("button");
+      clr.type="button"; clr.className="clear"; clr.innerHTML=X_SVG;
+      clr.setAttribute("aria-label","Clear "+name);
+      clr.addEventListener("click", function(){ el.value=""; el.focus(); });
+      box.appendChild(el); box.appendChild(clr);
+      wrap.appendChild(lab); wrap.appendChild(box); form.appendChild(wrap);
+    });
+  }
+
+  function renderSettings(){
+    $("url").value=url;
+    var list=$("fieldList"); list.innerHTML="";
+    fields.forEach(function(name,i){
+      var row=document.createElement("div"); row.className="row";
+      var inp=document.createElement("input"); inp.type="text"; inp.value=name; inp.setAttribute("aria-label","Field "+(i+1)+" name");
+      inp.addEventListener("input", function(){ fields[i]=inp.value; });
+      var del=document.createElement("button"); del.type="button"; del.textContent="Remove";
+      del.addEventListener("click", function(){ fields.splice(i,1); renderSettings(); });
+      row.appendChild(inp); row.appendChild(del); list.appendChild(row);
+    });
+  }
+
+  function renderPending(){
+    $("pending").textContent = queue.length ? queue.length+" submission"+(queue.length>1?"s":"")+" waiting to upload (will retry on next submit)." : "";
+  }
+
+  $("toggleSettings").addEventListener("click", function(){ $("settings").classList.toggle("open"); });
+  $("addField").addEventListener("click", function(){ fields.push("New field"); renderSettings(); });
+  $("saveSettings").addEventListener("click", function(){
+    fields = fields.map(function(s){return s.trim();}).filter(Boolean);
+    if(!fields.length) fields = DEFAULT_FIELDS.slice();
+    url = $("url").value.trim();
+    store.set("url",url); store.set("fields",JSON.stringify(fields));
+    renderForm(); renderSettings(); $("settings").classList.remove("open");
+    setStatus("Settings saved.","ok");
+  });
+
+  /* ---------- Upload ---------- */
+  function send(payload){
+    // text/plain avoids a CORS preflight; Apps Script reads the raw body.
+    return fetch(url,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+  }
+
+  submitBtn.addEventListener("click", function(){
+    if(!url){ $("settings").classList.add("open"); setStatus("Add your Apps Script URL in Settings first.","err"); return; }
+    var values={}, any=false;
+    form.querySelectorAll("[data-name]").forEach(function(el){ values[el.dataset.name]=el.value.trim(); if(el.value.trim()) any=true; });
+    if(!any){ setStatus("Fill in at least one field.","err"); return; }
+
+    queue.push({date:today(), values:values, fields:fields.slice()});
+    store.set("queue",JSON.stringify(queue));
+    submitBtn.disabled=true; setStatus("Uploading…");
+
+    (function next(){
+      if(!queue.length){ done(); return; }
+      send(queue[0]).then(function(){ queue.shift(); store.set("queue",JSON.stringify(queue)); next(); })
+        .catch(function(){ done(true); });
+    })();
+
+    function done(failed){
+      submitBtn.disabled=false; renderPending();
+      if(failed){ setStatus("No connection. Your entry is saved and will upload on your next submit.","err"); }
+      else{
+        setStatus("Sent. See it under Submitted.","ok");
+        form.querySelectorAll("[data-name]").forEach(function(el){ el.value=""; });
+      }
+    }
+  });
+
+  /* ---------- Submitted screen ---------- */
+  function showView(which){
+    var data = which==="data";
+    $("viewEntry").style.display = data ? "none" : "block";
+    $("viewData").style.display = data ? "block" : "none";
+    $("tabEntry").setAttribute("aria-selected", data ? "false" : "true");
+    $("tabData").setAttribute("aria-selected", data ? "true" : "false");
+    if(data){
+      if(!$("fromDate").value) $("fromDate").value = today();
+      if(!$("toDate").value) $("toDate").value = today();
+      loadData();
+    }
+  }
+  $("tabEntry").addEventListener("click", function(){ showView("entry"); });
+  $("tabData").addEventListener("click", function(){ showView("data"); });
+  $("refresh").addEventListener("click", loadData);
+  function onRangeChange(){
+    if(!$("fromDate").value) $("fromDate").value = today();
+    if(!$("toDate").value) $("toDate").value = today();
+    if(lastPayload) renderData(lastPayload);
+  }
+  $("fromDate").addEventListener("change", onRangeChange);
+  $("toDate").addEventListener("change", onRangeChange);
+  $("todayBtn").addEventListener("click", function(){
+    $("fromDate").value = today();
+    $("toDate").value = today();
+    if(lastPayload) renderData(lastPayload);
+  });
+  function rangeLabel(a,b){ return a===b ? fmtDate(a) : fmtDate(a)+" to "+fmtDate(b); }
+
+  function setTotals(b,r,a,title){
+    $("totBags").textContent=fmtNum(b); $("totRate").textContent=fmtNum(r); $("totAdvance").textContent=fmtNum(a);
+    $("totalsTitle").textContent=title;
+  }
+
+  function renderData(payload, note){
+    lastPayload = payload;
+    var list=$("dataList"); list.innerHTML="";
+    var from = $("fromDate").value || today(), to = $("toDate").value || today();
+    if(from > to){ var tmp=from; from=to; to=tmp; } // accept dates picked in either order
+    var label = rangeLabel(from,to);
+    var header=payload.header||[], allRows=payload.rows||[], dates=payload.dates, rowNums=payload.rowNums||[];
+
+    if(!dates){
+      $("dataInfo").textContent="Update Code.gs in Apps Script and redeploy a new version to filter by date.";
+      setTotals(0,0,0,"Totals"); return;
+    }
+
+    var rows=[];
+    for(var i=0;i<allRows.length;i++){ if(dates[i]>=from && dates[i]<=to) rows.push({r:allRows[i], n:rowNums[i]||0}); }
+    rows.reverse();
+
+    var idx = {bags:-1, rate:-1, advance:-1};
+    header.forEach(function(h,i){ var k=String(h).trim().toLowerCase(); if(idx.hasOwnProperty(k)) idx[k]=i; });
+    var tb=0,tr=0,ta=0;
+    rows.forEach(function(it){
+      var r=it.r;
+      if(idx.bags>-1) tb+=num(r[idx.bags]);
+      if(idx.rate>-1) tr+=num(r[idx.rate]);
+      if(idx.advance>-1) ta+=num(r[idx.advance]);
+    });
+    setTotals(tb,tr,ta,"Totals for "+label);
+
+    $("dataInfo").textContent = note || (rows.length+" entr"+(rows.length===1?"y":"ies")+" for "+label);
+    if(!rows.length){
+      var e=document.createElement("div"); e.className="empty"; e.textContent="No entries for this period."; list.appendChild(e); return;
+    }
+    var dIdx = header.indexOf("Date"); if(dIdx===-1) dIdx = header.indexOf("Timestamp");
+    rows.forEach(function(it){
+      var r=it.r;
+      var card=document.createElement("div"); card.className="card";
+      var head=document.createElement("div"); head.className="card-head";
+      var d=document.createElement("p"); d.className="entry-date"; d.textContent = dIdx>-1 ? r[dIdx] : label;
+      head.appendChild(d);
+      if(it.n){
+        var del=document.createElement("button"); del.type="button"; del.className="del"; del.innerHTML=TRASH_SVG;
+        del.setAttribute("aria-label","Delete this entry");
+        del.addEventListener("click", function(){ deleteEntry(it, header, del); });
+        head.appendChild(del);
+      }
+      card.appendChild(head);
+      header.forEach(function(h,i){
+        if(i===dIdx) return;
+        if(r[i]===undefined || r[i]==="") return;
+        var kv=document.createElement("div"); kv.className="kv";
+        var k=document.createElement("span"); k.className="k"; k.textContent=h;
+        var v=document.createElement("span"); v.className="v"; v.textContent=r[i];
+        kv.appendChild(k); kv.appendChild(v); card.appendChild(kv);
+      });
+      list.appendChild(card);
+    });
+  }
+
+  function deleteEntry(it, header, btn){
+    var parts=[];
+    header.forEach(function(h,i){ if(it.r[i]!==undefined && it.r[i]!=="") parts.push(h+": "+it.r[i]); });
+    if(!window.confirm("Delete this entry from the sheet?\n\n"+parts.join("\n")+"\n\nThis can't be undone from the app.")) return;
+    btn.disabled=true; $("dataInfo").textContent="Deleting…";
+    var q = url+(url.indexOf("?")>-1?"&":"?")+"action=delete&row="+it.n+"&check="+encodeURIComponent(it.r.join("|"));
+    fetch(q).then(function(r){ return r.json(); }).then(function(res){
+      if(res && res.ok){ loadData(); return; }
+      btn.disabled=false;
+      if(res && res.header) $("dataInfo").textContent="Update Code.gs in Apps Script and redeploy a new version to enable delete.";
+      else if(res && res.error==="changed") $("dataInfo").textContent="The sheet changed since it was loaded. Tap Refresh and try again.";
+      else $("dataInfo").textContent="Couldn't delete: "+((res && res.error)||"unknown error");
+    }).catch(function(){
+      btn.disabled=false; $("dataInfo").textContent="Couldn't reach the sheet. Check your connection and try again.";
+    });
+  }
+
+  function loadData(){
+    if(!url){ $("dataList").innerHTML=""; $("dataInfo").textContent="Add your Apps Script URL in Settings first."; return; }
+    $("dataInfo").textContent="Loading…";
+    fetch(url).then(function(r){ return r.json(); }).then(function(payload){
+      store.set("dataCache", JSON.stringify(payload));
+      renderData(payload);
+    }).catch(function(){
+      var cached=null; try{ cached=JSON.parse(store.get("dataCache")||"null"); }catch(e){}
+      if(cached) renderData(cached, "Couldn't reach the sheet. Showing the last saved copy.");
+      else{ $("dataList").innerHTML=""; $("dataInfo").textContent="Couldn't load data. Check your URL and that the latest Code.gs is deployed as a new version."; }
+    });
+  }
+
+  renderForm(); renderSettings(); renderPending();
+  if(!url) $("settings").classList.add("open");
+})();
+</script>
+</body>
+</html>
